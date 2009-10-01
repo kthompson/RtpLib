@@ -152,7 +152,7 @@ namespace RtpLib
         /// Gets the next payload from the packet list in the form of a byte array. This must only be called by <c>EnsureBufferOf</c> 
         /// </summary>
         /// <returns></returns>
-        public byte[] GetNextPayload()
+        public byte[] GetPayload()
         {
             /* Get all packet payloads up to Marker
              *      make sure they are all in sequence

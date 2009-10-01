@@ -221,7 +221,7 @@ namespace RtpLib
             {
                 while (_data.Length - _bufferPosition < size)
                 {
-                    var payload = this._rtpListener.GetNextPayload();
+                    var payload = this._rtpListener.GetPayload();
 
                     if (payload != null)
                     {
