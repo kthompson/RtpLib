@@ -47,6 +47,18 @@ namespace RtpLib
         }
 
         /// <summary>
+        /// Generic assertion that will throw whatever exception you specify if the expression is false
+        /// </summary>
+        /// <param name="expression">Expression that evaluates to a boolean to check</param>
+        /// <param name="exceptionCreator"></param>
+        [System.Diagnostics.DebuggerHidden]
+        public static void IsNot(bool expression, Func<Exception> exceptionCreator)
+        {
+            if (expression)
+                Throw(exceptionCreator);
+        }
+
+        /// <summary>
         /// Throws an ArgumentNullException if the argument is null
         /// </summary>
         /// <typeparam name="T">Class</typeparam>

@@ -113,7 +113,7 @@ namespace RtpLib
 
         public uint SyncSourceId { get; private set; }
 
-        private List<uint> _contributingSourceIds;
+        private readonly List<uint> _contributingSourceIds;
         public List<uint> ContributingSourceIds
         {
             get { return _contributingSourceIds; }

@@ -71,6 +71,7 @@
       <DependentUpon>Settings.settings</DependentUpon>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
+    <Compile Include="RtpListener.cs" />
     <Compile Include="RtpPacket.cs" />
     <Compile Include="RtpStream.cs" />
     <Compile Include="UdpBuffer.cs" />

@@ -14,44 +14,71 @@ namespace RtpLib
     public class RtpStream : Stream
     {
 
-        public class Constants
-        {
-            public const int PacketSize = 1400;
-            public const int BufferSize = PacketSize * 1024;
-            public const int AutoFlushBufferMaximum = BufferSize * 15;
-        }
+        public const int AutoFlushBufferMaximum = RtpListener.Constants.BufferSize * 15;
 
-        private UdpListener _listener;
-        private SortedList<RtpPacket, RtpPacket> _packets;
-
-        private readonly object _packetLock = new object();
+        private RtpListener _rtpListener;
         private readonly object _dataLock = new object();
         
         #region constructors
 
-        public RtpStream()
-            : this(new IPEndPoint(IPAddress.Any, 0))
+        public RtpStream(IPEndPoint localEp)
         {
-
+            _rtpListener = new RtpListener(localEp);
+            _rtpListener.PacketReceived += OnPacketReceived;
+            this.AutoFlush = true;
         }
 
         public RtpStream(int port)
-            : this(new IPEndPoint(IPAddress.Any, port))
         {
-
+            _rtpListener = new RtpListener(port);
+            _rtpListener.PacketReceived += OnPacketReceived;
+            this.AutoFlush = true;
         }
-
-        public RtpStream(IPEndPoint localEp)
-        {
-            _packets = new SortedList<RtpPacket, RtpPacket>();
-            _listener = new UdpListener(localEp);            
-            _listener.BufferSize = Constants.PacketSize;
-            _listener.ReceiveBuffer = Constants.BufferSize;
-            _listener.ReceiveCallback = DataReceived;
-        }
+        
 
         #endregion
-        
+
+
+        void OnPacketReceived(object sender, EventArgs<RtpPacket> e)
+        {
+            lock (_dataLock)
+            {
+                _length += e.Data.PayloadLength;
+
+                //Let the EnsureBufferOf know that we got some more data
+                Monitor.Pulse(_dataLock);
+            }
+        }
+
+
+        #region static methods
+        public static RtpStream Open(string uri)
+        {
+            var test = new Regex(@"(?<proto>[a-zA-Z]+)://@(?<ip>[\d\.]+)?(:(?<port>\d+))?");
+            int port;
+            IPAddress ip;
+
+            Assert.That(test.IsMatch(uri), () => new ArgumentException("Please use a format of 'udp://@MCIP:PORT' where MCIP is a valid multicast IP address.", "uri"));
+
+            var m = test.Match(uri);
+
+            Assert.AreEqual(m.Groups["proto"].Value.ToLower(), "udp", "protocol");
+
+            if (!IPAddress.TryParse(m.Groups["ip"].Value, out ip))
+                ip = IPAddress.Any;
+
+            if (!int.TryParse(m.Groups["port"].Value, out port))
+                port = 1234;
+
+
+            var client = new RtpStream(port);
+            client._rtpListener.StartListening();
+            client._rtpListener.JoinMulticastGroup(ip);
+            return client;
+
+        }
+        #endregion
+
         #region properties
 
 
@@ -96,32 +123,6 @@ namespace RtpLib
             }
         }
 
-
-
-        private int _markerCount;
-        public int MarkerCount
-        {
-            get
-            {
-                lock (_packetLock)
-                {
-                    return _markerCount;
-                }
-            }
-        }
-        /* TODO: only process once two markers are available to ensure all packets for the 
-         * next marker are there
-         * */
-        public bool IsPayloadAvailable
-        {
-            get {
-                lock (_packetLock)
-                {
-                    return _markerCount > 0;
-                }
-            }
-        }
-
         public override bool CanRead
         {
             get { return true; }
@@ -137,42 +138,11 @@ namespace RtpLib
             get { return false; }
         }
 
-        private bool _autoFlush = true;
-        public bool AutoFlush
-        {
-            get { return _autoFlush; }
-            set { _autoFlush = value; }
-        }
+        public bool AutoFlush { get; set; }
 
         #endregion
 
-        #region static methods
-        public static RtpStream Open(string uri)
-        {
-            var test = new Regex(@"(?<proto>[a-zA-Z]+)://@(?<ip>[\d\.]+)?(:(?<port>\d+))?");
-            int port;
-            IPAddress ip;
 
-            Assert.That(test.IsMatch(uri), () => new ArgumentException("Please use a format of 'udp://@MCIP:PORT' where MCIP is a valid multicast IP address.","uri"));
-
-            var m = test.Match(uri);
-
-            Assert.AreEqual(m.Groups["proto"].Value.ToLower(), "udp", "protocol");
-            
-            if(!IPAddress.TryParse(m.Groups["ip"].Value, out ip))
-                ip = IPAddress.Any;
-
-            if(!int.TryParse(m.Groups["port"].Value, out port))
-                port = 1234;
-
-
-            var client = new RtpStream(port);
-            client._listener.StartListening();
-            client._listener.JoinMulticastGroup(ip);
-            return client;
-                
-        }
-        #endregion
 
         #region public methods
 
@@ -187,8 +157,6 @@ namespace RtpLib
                 Buffer.BlockCopy(_data, _bufferPosition, buffer, offset, count);
                 _bufferPosition += count;
 
-                //Let the EnsureBufferOf know that we got some more data
-                Monitor.Pulse(_dataLock);
                 return count;
             }
         }
@@ -229,45 +197,6 @@ namespace RtpLib
 
         #region private methods
 
-
-        /// <summary>
-        /// Method to handle incoming data from <c>_listener</c>.
-        /// </summary>
-        /// <param name="listener">The listener.</param>
-        /// <param name="buffer">The buffer.</param>
-        private void DataReceived(UdpListener listener, UdpBuffer buffer)
-        {
-            ThreadPool.QueueUserWorkItem(
-                                            delegate
-                                                {
-                                                try
-                                                {
-                                                    var packet = RtpPacket.FromUdpBuffer(buffer);
-                                                    lock (_packetLock)
-                                                    {
-                                                        this._packets.Add(packet, packet);
-
-                                                        if (packet.Marker)
-                                                            _markerCount++;
-                                                    }
-
-                                                    lock (_dataLock)
-                                                    {
-                                                        _length += packet.PayloadLength;
-                                                    }
-                                                    if (packet.Marker)
-                                                        OnMarkerReceived(packet);
-                                                    OnPacketReceived(packet);
-                                                }
-                                                catch (InvalidDataException ex)
-                                                {
-                                                    OnInvalidData(buffer);
-                                                    Assert.Suppress(ex);
-                                                }
-                                            });
-        }
-
-
         /// <summary>
         /// Internal method to run the auto flush if required.
         /// </summary>
@@ -275,80 +204,9 @@ namespace RtpLib
         {
             lock (_dataLock)
             {
-                if (_autoFlush && _data.Length > Constants.AutoFlushBufferMaximum)
+                if (this.AutoFlush && _data.Length > AutoFlushBufferMaximum)
                     this.Flush();
             }
-        }
-
-
-
-        /// <summary>
-        /// Gets the next payload from the packet list in the form of a byte array. This must only be called by <c>EnsureBufferOf</c> 
-        /// </summary>
-        /// <returns></returns>
-        private byte[] GetNextPayload()
-        {
-            /* Get all packet payloads up to Marker
-             *      make sure they are all in sequence
-             *      return the payload as a byte array
-             *      delete all packets from main packet array
-             * Determine if there is another marker available already...
-             *    if there is, then set payload available to true.
-             * */
-            long payloadSize = 0;
-            List<RtpPacket> payloadPackets;
-
-            lock (_packetLock)
-            {
-                if (!IsPayloadAvailable)
-                    return null;
-
-                payloadPackets = new List<RtpPacket>();
-
-                //add all payload packets into a temporary list
-                foreach (var kv in _packets)
-                {
-                    payloadPackets.Add(kv.Value);
-                    payloadSize += kv.Value.PayloadLength;
-                    if (kv.Value.Marker)
-                    {
-                        _markerCount--;
-                        break;
-                    }
-                }
-
-                // remove the payload packets to be returned from the main list
-                foreach (var packet in payloadPackets)
-                    _packets.Remove(packet);
-            }
-
-            // handle the payload now
-            var payload = new byte[payloadSize];
-            var payloadStartPosition = 0;
-            //validate sequence numbers
-            var seqNumber = payloadPackets[0].SequenceNumber;
-            foreach (var packet in payloadPackets)
-            {
-                if (packet.SequenceNumber == seqNumber)
-                {
-                    // copy the packets payload into our payload array
-                    payloadStartPosition += packet.CopyPayloadTo(payload, payloadStartPosition);
-                    // increment seq number to check on next loop
-                    seqNumber++;
-                }
-                else
-                {
-                    /* the sequence numbers are not in order or there are missing packets
-                     * 
-                     * TODO: we may have missed a marker packet so we should try to restart by updated 
-                     * the seqNumber and payload size
-                     * 
-                     * */
-                    OnPacketLoss();
-                    return new byte[] { };
-                }
-            }
-            return payload;
         }
 
         private byte[] _data = new byte[] { };
@@ -363,12 +221,7 @@ namespace RtpLib
             {
                 while (_data.Length - _bufferPosition < size)
                 {
-                    byte[] payload;
-
-                    lock (_packetLock)
-                    {
-                        payload = this.GetNextPayload();
-                    }
+                    var payload = this._rtpListener.GetNextPayload();
 
                     if (payload != null)
                     {
@@ -396,67 +249,19 @@ namespace RtpLib
 
         #endregion
 
-        #region events
-        /// <summary>
-        /// Occurs when a packet is received that is not a valid rtp packet.
-        /// </summary>
-        public event EventHandler<EventArgs<UdpBuffer>> InvalidData;
-        protected virtual void OnInvalidData(UdpBuffer buffer)
-        {
-            var handler = InvalidData;
-            if (handler != null)
-                handler(this, new EventArgs<UdpBuffer>(buffer));
-        }
-
-        /// <summary>
-        /// Occurs when a packet is received.
-        /// </summary>
-        public event EventHandler<EventArgs<RtpPacket>> PacketReceived;
-        protected virtual void OnPacketReceived(RtpPacket packet)
-        {
-            var handler = PacketReceived;
-
-            if (handler != null)
-                handler(this, new EventArgs<RtpPacket>(packet));
-        }
-
-        /// <summary>
-        /// Occurs when a marker packet is received.
-        /// </summary>
-        public event EventHandler<EventArgs<RtpPacket>> MarkerReceived;
-        protected virtual void OnMarkerReceived(RtpPacket packet)
-        {
-            var handler = MarkerReceived;
-            if (handler != null)
-                handler(this, new EventArgs<RtpPacket>(packet));
-        }
-
-        /// <summary>
-        /// Occurs when a packet is loss or missed
-        /// </summary>
-        public event EventHandler PacketLoss;
-        protected virtual void OnPacketLoss()
-        {
-            var handler = PacketLoss;
-            if (handler != null)
-                handler(this, EventArgs.Empty);
-        }
-        #endregion
+        
 
         protected override void Dispose(bool disposing)
         {
             base.Dispose(disposing);
-            if (this._listener != null)
+
+            if (disposing)
             {
-                this._listener.Dispose(disposing);
-                this._listener = null;
+                this._rtpListener.Dispose();
             }
 
-            lock(_packetLock)
-            {
-                if (_packets != null)
-                    _packets = null;
-            }
+            this._rtpListener = null;
+           
 
             lock (_dataLock)
             {
