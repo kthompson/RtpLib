@@ -278,30 +278,30 @@ namespace RtpLib
         private void DataReceived(UdpListener listener, UdpBuffer buffer)
         {
             ThreadPool.QueueUserWorkItem(
-                                            delegate
-                                            {
-                                                try
-                                                {
-                                                    var packet = RtpPacket.FromUdpBuffer(buffer);
-                                                    lock (_receivingLock)
-                                                    {
-                                                        this._receivedPackets.Add(packet);
+                delegate
+                    {
+                        try
+                        {
+                            var packet = RtpPacket.FromUdpBuffer(buffer);
+                            lock (_receivingLock)
+                            {
+                                this._receivedPackets.Add(packet);
 
-                                                        //signal that we got a packets
-                                                        Monitor.Pulse(_receivingLock);
-                                                    }
+                                //signal that we got a packets
+                                Monitor.Pulse(_receivingLock);
+                            }
 
-                                                    //if we dont care about sequence order, use these
-                                                    if (packet.Marker)
-                                                        OnMarkerReceived(packet);
-                                                    OnPacketReceived(packet);
-                                                }
-                                                catch (InvalidDataException ex)
-                                                {
-                                                    OnInvalidData(buffer);
-                                                    Assert.Suppress(ex);
-                                                }
-                                            });
+                            //if we dont care about sequence order, use these
+                            if (packet.Marker)
+                                OnMarkerReceived(packet);
+                            OnPacketReceived(packet);
+                        }
+                        catch (InvalidDataException ex)
+                        {
+                            OnInvalidData(buffer);
+                            Assert.Suppress(ex);
+                        }
+                    });
         }
 
         /// <summary>
