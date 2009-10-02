@@ -29,15 +29,22 @@ namespace RtpLib
 
         #region public methods
 
-        public int CopyPayloadTo(Stream buffer)
+        public byte[] GetPayload()
+        {
+            var buffer = new MemoryStream(this.PayloadLength);
+            this.WriteTo(buffer);
+            return buffer.GetBuffer();
+        }
+
+        public int WriteTo(Stream buffer)
         {
             buffer.Write(this.Data, this.PayloadStartPosition, this.PayloadLength);
             return PayloadLength;
         }
 
-        public int CopyPayloadTo(byte[] buffer, int startIndex)
+        public int WriteTo(byte[] buffer, int destOffset)
         {
-            Buffer.BlockCopy(this.Data, this.PayloadStartPosition, buffer, startIndex, PayloadLength);
+            Buffer.BlockCopy(this.Data, this.PayloadStartPosition, buffer, destOffset, PayloadLength);
             return PayloadLength;
         }
         #endregion
@@ -128,5 +135,10 @@ namespace RtpLib
         }
 
         #endregion
+
+        public override string ToString()
+        {
+            return string.Format("{0}: {1}", base.ToString(), this.SequenceNumber);
+        }
     }
 }

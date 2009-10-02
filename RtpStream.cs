@@ -43,8 +43,6 @@ namespace RtpLib
         {
             lock (_dataLock)
             {
-                _length += e.Data.PayloadLength;
-
                 //Let the EnsureBufferOf know that we got some more data
                 Monitor.Pulse(_dataLock);
             }
@@ -81,21 +79,14 @@ namespace RtpLib
 
         #region properties
 
-
-
-        private long _length;
         public override long Length
         {
             get
             {
-                lock (_dataLock)
-                {
-                    return _length;
-                }
+                throw new NotSupportedException("Length is not supported since the size of the Stream can change dynamically.");
             }
         }
 
-        private long _lastFlushPosition;
         private int _bufferPosition;
         /// <summary>
         /// When overridden in a derived class, gets or sets the position within the current stream.
@@ -107,19 +98,11 @@ namespace RtpLib
         {
             get
             {
-                lock (_dataLock)
-                {
-                    return _lastFlushPosition + _bufferPosition;
-                }
+                throw new NotSupportedException("Position is not supported since the size of the Stream can change dynamically.");
             }
             set
             {
-                lock (_dataLock)
-                {
-                    Assert.IsGreaterThan(value, "position", _lastFlushPosition);
-                    Assert.IsLessThan(value, "position", _data.Length);
-                    _bufferPosition = (int)(value - _lastFlushPosition);
-                }
+                throw new NotSupportedException("Position is not supported since the size of the Stream can change dynamically.");
             }
         }
 
@@ -184,7 +167,7 @@ namespace RtpLib
         {
             lock (_dataLock)
             {
-                _lastFlushPosition = this.Position;
+                //basically this copies all unread data into a new buffer that does not include the Read data.
                 var newBuffer = new byte[_data.Length - _bufferPosition];
                 Buffer.BlockCopy(_data, _bufferPosition, newBuffer, 0, newBuffer.Length);
                 _bufferPosition = 0;
@@ -221,7 +204,7 @@ namespace RtpLib
             {
                 while (_data.Length - _bufferPosition < size)
                 {
-                    var payload = this._rtpListener.GetPayload();
+                    var payload = this._rtpListener.GetCombinedPayload();
 
                     if (payload != null)
                     {
@@ -229,10 +212,6 @@ namespace RtpLib
                     }
                     else
                     {
-                        //TODO: We should really wait the full amount and use signaling to resume
-                        //sleep doesn't release the lock so we need to use wait
-                        //otherwise we'll get a ton of backed up jobs in the queue all waiting to update _length
-                        //I could be missing an error somewhere that this is causing now, but it seems to have solved my problem
                         Monitor.Wait(_dataLock);
                     }
                 }
@@ -257,6 +236,7 @@ namespace RtpLib
 
             if (disposing)
             {
+                this._rtpListener.PacketReceived -= OnPacketReceived;
                 this._rtpListener.Dispose();
             }
 
