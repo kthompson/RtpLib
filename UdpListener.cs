@@ -209,11 +209,12 @@ namespace RtpLib
             switch (this.LocalEp.AddressFamily)
             {
                 case AddressFamily.InterNetwork:
-                    var option1 = new MulticastOption(address);
+                    var option1 = new MulticastOption(address, this.LocalEp.Address);
                     this._client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.AddMembership, option1);
                     this._client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastTimeToLive, ttl);
                     break;
                 case AddressFamily.InterNetworkV6:
+                    //FIXME: this should be using the interface index of the interface we are bound to.
                     var option2 = new IPv6MulticastOption(address);
                     this._client.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.AddMembership, option2);
                     this._client.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.MulticastTimeToLive, ttl);
@@ -233,7 +234,7 @@ namespace RtpLib
             {
                 case AddressFamily.InterNetwork:
                     {
-                        var option1 = new MulticastOption(address);
+                        var option1 = new MulticastOption(address, this.LocalEp.Address);
                         this._client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.AddMembership, option1);
                     }
                     break;
