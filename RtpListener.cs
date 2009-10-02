@@ -224,11 +224,6 @@ namespace RtpLib
                             OnSequencedMarkerReceived(nextPacket);
                         OnSequencedPacketReceived(nextPacket);
                     }
-
-                    //if not use these...
-                    if (nextPacket.Marker)
-                        OnMarkerReceived(nextPacket);
-                    OnPacketReceived(nextPacket);
                 }
             }
             catch (ThreadInterruptedException)
@@ -258,6 +253,11 @@ namespace RtpLib
                                                         //signal that we got a packets
                                                         Monitor.Pulse(_receivingLock);
                                                     }
+
+                                                    //if we dont care about sequence order, use these
+                                                    if (packet.Marker)
+                                                        OnMarkerReceived(packet);
+                                                    OnPacketReceived(packet);
                                                 }
                                                 catch (InvalidDataException ex)
                                                 {
