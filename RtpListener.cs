@@ -232,8 +232,15 @@ namespace RtpLib
                             Monitor.Wait(_receivingLock);
                         }
                     }
+
+
+                    //FIXME: it may be possible for us to have old packets with lower sequence numbers queued up.
+
                     //now we can start looking for the next packet
-                    seqNumber++;
+                    if (seqNumber == ushort.MaxValue)
+                        seqNumber = ushort.MinValue;
+                    else
+                        seqNumber++;
 
                     //we went through all packets but could not find the next in the sequence so skip it...
                     if (nextPacket == null)
