@@ -180,7 +180,7 @@ namespace RtpLib
 
         private void SequencingThread()
         {
-            var seqNumber = 0;
+            ushort seqNumber = 0;
             var payloadType = 0;
             try
             {

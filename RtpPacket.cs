@@ -105,12 +105,12 @@ namespace RtpLib
                 PayloadType = (byte)(flags & 0x7F);
 
 
-                SequenceNumber = ReadInt16(stream);
-                Timestamp = ReadInt32(stream);
-                SyncSourceId = ReadInt32(stream);
+                SequenceNumber = ReadUInt16(stream);
+                Timestamp = ReadUInt32(stream);
+                SyncSourceId = ReadUInt32(stream);
 
                 for (var i = 0; i < NumberOfCCs; i++)
-                    _contributingSourceIds.Add(ReadInt32(stream));
+                    _contributingSourceIds.Add(ReadUInt32(stream));
 
                 PayloadStartPosition = (int)stream.Position;
                 PayloadLength = (int)(this.Size - stream.Position);
@@ -118,7 +118,7 @@ namespace RtpLib
         }
 
         #region helper methods
-        private uint ReadInt32(Stream stream)
+        private uint ReadUInt32(Stream stream)
         {
             return (uint)((stream.ReadByte() << 24)
                           + (stream.ReadByte() << 16)
@@ -126,7 +126,7 @@ namespace RtpLib
                           + (stream.ReadByte()));
         }
 
-        private ushort ReadInt16(Stream stream)
+        private ushort ReadUInt16(Stream stream)
         {
             return (ushort)((stream.ReadByte() << 8)
                             + (stream.ReadByte()));
@@ -151,7 +151,7 @@ namespace RtpLib
 
         public byte PayloadType { get; private set; }
 
-        public int SequenceNumber { get; private set; }
+        public ushort SequenceNumber { get; private set; }
 
         public uint Timestamp { get; private set; }
 
