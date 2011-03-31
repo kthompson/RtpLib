@@ -61,6 +61,7 @@ namespace TestApp
 
         private void btnStart_Click(object sender, EventArgs e)
         {
+            btnStop_Click(sender, e);
             if (File.Exists("temp.mpv"))
                 File.Delete("temp.mpv");
 
@@ -68,7 +69,13 @@ namespace TestApp
 
             _listener = RtpListener.Open(txtUri.Text);
             _listener.SequencedMarkerReceived += MarkerReceived;
+            _listener.PacketLoss += new EventHandler<EventArgs<int>>(OnPacketLoss);
             _listener.VerifyPayloadType = false;
+        }
+
+        private void OnPacketLoss(object sender, EventArgs<int> e)
+        {
+            System.Diagnostics.Debug.Write("PacketLoss: " + e.Data);
         }
 
         void MarkerReceived(object sender, EventArgs<RtpPacket> e)
