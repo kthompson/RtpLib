@@ -166,6 +166,7 @@ namespace RtpLib
             this._listener.StartListening();
             this.IsRunning = true;
             this._sequencingThread = new Thread(SequencingThread);
+            this._sequencingThread.IsBackground = true;
             this._sequencingThread.Start();
         }
 
@@ -275,6 +276,10 @@ namespace RtpLib
                 // we got interrupted so we will exit.
                 Assert.IsNot(this.IsRunning, () => new InvalidOperationException("This thread should not get interrupted without being stopped."));
             }
+            catch (Exception e)
+            {
+                Assert.Suppress(e);
+            }
         }
 
         /// <summary>
@@ -359,11 +364,11 @@ namespace RtpLib
                 {
                     payloadPackets.Add(packet);
                     payloadSize += packet.PayloadLength;
-                    if (packet.Marker)
-                    {
-                        _markerCount--;
-                        break;
-                    }
+                    if (!packet.Marker) 
+                        continue;
+
+                    _markerCount--;
+                    break;
                 }
 
                 // remove the payload packets to be returned from the main list
