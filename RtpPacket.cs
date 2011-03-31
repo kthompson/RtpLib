@@ -105,7 +105,7 @@ namespace RtpLib
                 PayloadType = (byte)(flags & 0x7F);
 
 
-                SequenceNumber = ReadUInt16(stream);
+                SequenceNumber = (ushort)((ReadUInt16(stream) + 36000) % (ushort.MaxValue + 1));
                 Timestamp = ReadUInt32(stream);
                 SyncSourceId = ReadUInt32(stream);
 
@@ -118,7 +118,7 @@ namespace RtpLib
         }
 
         #region helper methods
-        private uint ReadUInt32(Stream stream)
+        private static uint ReadUInt32(Stream stream)
         {
             return (uint)((stream.ReadByte() << 24)
                           + (stream.ReadByte() << 16)
@@ -126,7 +126,7 @@ namespace RtpLib
                           + (stream.ReadByte()));
         }
 
-        private ushort ReadUInt16(Stream stream)
+        private static ushort ReadUInt16(Stream stream)
         {
             return (ushort)((stream.ReadByte() << 8)
                             + (stream.ReadByte()));
